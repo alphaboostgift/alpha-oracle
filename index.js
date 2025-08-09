@@ -18,123 +18,92 @@ const PRODUCTS = {
   fitness: {
     name: "AlphaFit Classic Tee",
     url: "https://alphabooststore.com/products/alphafit-classic-tee",
-    triggers: ["fitness", "workout", "strength", "gym", "muscle", "strong", "exercise", "athletic", "health"]
+    triggers: ["fitness", "workout", "strength", "gym", "muscle", "exercise", "athletic", "health"]
   },
   transformation: {
     name: "The Triad of Change - Empowering Transformation Tee", 
     url: "https://alphabooststore.com/products/the-triad-of-change-empowering-transformation-tee",
-    triggers: ["change", "transform", "life", "new", "growth", "evolve", "different", "better", "improve"]
+    triggers: ["change", "transform", "life", "growth", "evolve", "better", "improve"]
   },
   warrior: {
     name: "Warrior Rise Again - Mindset Tee",
     url: "https://alphabooststore.com/products/warrior-rise-again-mindset-tee", 
-    triggers: ["warrior", "fight", "overcome", "rise", "strength", "never give up", "battle", "strong", "defeat", "conquer"]
+    triggers: ["warrior", "fight", "overcome", "rise", "battle", "conquer"]
   },
   balance: {
     name: "Balance Mind Heart Harmony Tee",
     url: "https://alphabooststore.com/products/balance-mind-heart-harmony-tee",
-    triggers: ["balance", "harmony", "peace", "mind", "heart", "centered", "calm", "meditation", "zen", "equilibrium"]
+    triggers: ["balance", "harmony", "peace", "mind", "calm", "zen"]
   },
   angel: {
     name: "God Knew I Needed An Angel - Comfort Tee",
     url: "https://alphabooststore.com/products/god-knew-i-needed-an-angel-unisex-comfort-t-shirt-gift-for-husband-wife",
-    triggers: ["angel", "love", "blessed", "grateful", "gift", "comfort", "faith", "divine", "spiritual", "thankful"]
+    triggers: ["angel", "love", "blessed", "gift", "faith", "spiritual"]
   },
   performance: {
     name: "AlphaFit™ IceSkin Pro Tee - Feather Light",
     url: "https://alphabooststore.com/products/alphafit%E2%84%A2-iceskin-pro-tee-feather-light-breathable-athletic-cut",
-    triggers: ["performance", "athletic", "sports", "training", "breathable", "comfort", "pro", "advanced", "elite"]
+    triggers: ["performance", "athletic", "sports", "training", "breathable"]
   },
   confidence: {
     name: "AlphaFit™ Sculpted Tee - Muscle Fit", 
     url: "https://alphabooststore.com/products/alphafit%E2%84%A2-sculpted-tee-short-sleeve-muscle-fit",
-    triggers: ["confidence", "sculpted", "body", "muscle", "fit", "physique", "appearance", "self-image", "look good"]
+    triggers: ["confidence", "sculpted", "muscle", "fit", "physique"]
   }
 };
 
-// 🧠 Function to find matching product based on user message
+const COLLECTION_URL = "https://alphabooststore.com/collections/alphafit-collection";
+const SHIPPING_INFO = "🚚 Delivery: Free in USA | $5.99 worldwide";
+
+// 🧠 Function to find matching product
 function findMatchingProduct(message) {
   const messageLower = message.toLowerCase();
-  
-  for (const [key, product] of Object.entries(PRODUCTS)) {
-    const hasMatch = product.triggers.some(trigger => 
-      messageLower.includes(trigger.toLowerCase())
-    );
-    if (hasMatch) {
+  for (const product of Object.values(PRODUCTS)) {
+    if (product.triggers.some(trigger => messageLower.includes(trigger))) {
       return product;
     }
   }
   return null;
 }
 
-console.log("⚠️ MongoDB is temporarily disabled.");
-
-// 🧙‍♂️ MAIN ALPHA ORACLE ENDPOINT
+// 🧙‍♂️ MAIN ENDPOINT
 app.post('/chat', async (req, res) => {
   try {
     const { message } = req.body;
-    
-    // Find matching product for this user's message
     const matchedProduct = findMatchingProduct(message);
-    
-    // Create system prompt with product knowledge
-    let systemPrompt = `You are Alpha Oracle - a wise, empathetic motivational assistant who helps people overcome challenges and unlock their inner strength.
 
-PERSONALITY:
-- Speak with wisdom and compassion
-- Be encouraging but realistic
-- Focus on solutions and growth
-- Keep responses concise but impactful (max 150 words)
-- Use a warm, understanding tone
-
-GUIDELINES:
-1. Provide genuine, helpful motivational advice FIRST
-2. Address their specific challenge with actionable steps
-3. Be solution-focused and encouraging`;
-
-    // Add product recommendation if there's a match
-    if (matchedProduct) {
-      systemPrompt += `
-
-PRODUCT RECOMMENDATION:
-If it feels natural and helpful, you may mention: "${matchedProduct.name}" from AlphaBoostStore.com as a daily reminder of their strength and commitment.
-Link: ${matchedProduct.url}
-
-IMPORTANT: Only suggest the product if it emotionally aligns with your advice. The motivational guidance is primary - product mention is secondary and optional.`;
-    }
+    let systemPrompt = `You are Alpha Oracle — a short, powerful motivational guide in an online store.
+RULES:
+- Answer in max 3 short sentences.
+- Always give 1 motivational line + 1 suggestion to view a product or the AlphaFit Collection.
+- Mention: "${SHIPPING_INFO}" at the end.
+- If a specific product matches, suggest it, else suggest the AlphaFit Collection: ${COLLECTION_URL}.
+Keep it friendly, confident, and inspiring.`;
 
     const completion = await openai.chat.completions.create({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: message }
       ],
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       temperature: 0.8,
-      max_tokens: 200
+      max_tokens: 80
     });
 
     const reply = completion.choices[0].message.content;
-    
-    // Log for debugging
-    console.log(`🔮 Oracle responded to: "${message.substring(0, 50)}..."`);
-    if (matchedProduct) {
-      console.log(`💎 Matched product: ${matchedProduct.name}`);
-    }
-
     res.json({ reply });
-    
+
   } catch (err) {
     console.error('❌ OpenAI error:', err);
-    res.status(500).json({ error: 'Alpha Oracle is temporarily unavailable. Please try again.' });
+    res.status(500).json({ error: 'Alpha Oracle is temporarily unavailable.' });
   }
 });
 
-// Health check endpoint
+// Health check
 app.get('/', (req, res) => {
-  res.send('🔥 Alpha Oracle is alive and ready to help transform lives!');
+  res.send('🔥 Alpha Oracle is live!');
 });
 
 app.listen(3000, () => {
-  console.log('✅ Alpha Oracle running on http://localhost:3000');
-  console.log(`💎 Product database loaded: ${Object.keys(PRODUCTS).length} items`);
+  console.log('✅ Running on http://localhost:3000');
 });
