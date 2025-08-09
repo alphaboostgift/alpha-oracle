@@ -1,3 +1,4 @@
+// ====== Alpha Oracle Server (Full) ======
 import express from "express";
 import cors from "cors";
 import OpenAI from "openai";
@@ -10,11 +11,13 @@ const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-/* ================================
+const SHOP_URL = "https://alphabooststore.com/collections/alphafit-collection";
+
+/* =======================================
    PRODUCT DATABASE – FULL
-================================ */
+======================================= */
 const PRODUCTS = [
-  // FITNESS
+  // ---------- FITNESS ----------
   {
     name: "AlphaFit Classic Muscle Tee",
     url: "https://alphabooststore.com/products/alphafit-classic-muscle-tee",
@@ -22,7 +25,7 @@ const PRODUCTS = [
     category: "fitness",
     material: "100% premium cotton",
     sizes: ["S","M","L","XL","2XL"],
-    triggers: ["strength","muscles","gym","workout","training","power","muscle tee","alpha fit"]
+    triggers: ["strength","muscles","gym","workout","training","power","muscle tee","alpha fit","everyday"]
   },
   {
     name: "AlphaFit HyperDry Training Tee",
@@ -31,7 +34,7 @@ const PRODUCTS = [
     category: "fitness",
     material: "quick-dry polyester blend",
     sizes: ["S","M","L","XL","2XL","3XL","4XL"],
-    triggers: ["quick dry","summer training","lightweight","polyester","gym shirt","training shirt"]
+    triggers: ["quick dry","quick-dry","summer","hot","heat","lightweight","breathable","polyester","gym shirt","training shirt","sweat"]
   },
   {
     name: "AlphaFit ICE Cotton Tee",
@@ -40,7 +43,7 @@ const PRODUCTS = [
     category: "fitness",
     material: "ICE cotton",
     sizes: ["S","M","L","XL","2XL","3XL","4XL"],
-    triggers: ["cool","breathable","summer","ice cotton","light","workout","alpha fit"]
+    triggers: ["ice cotton","cool","breathable","summer","hot","heat","light","workout","alpha fit","sweat"]
   },
   {
     name: "AlphaFit IceSilk Performance Tee",
@@ -49,7 +52,7 @@ const PRODUCTS = [
     category: "fitness",
     material: "IceSilk synthetic",
     sizes: ["S","M","L","XL","2XL","3XL"],
-    triggers: ["icesilk","performance tee","gym performance","fast dry","lightweight","cool shirt"]
+    triggers: ["icesilk","ice silk","performance","fast dry","quick dry","lightweight","cool","summer","hot","heat","breathable"]
   },
   {
     name: "AlphaFit IceSkin Pro Tee",
@@ -58,7 +61,7 @@ const PRODUCTS = [
     category: "fitness",
     material: "cotton + synthetic blend",
     sizes: ["S","M","L","XL","2XL","3XL","4XL"],
-    triggers: ["iceskin","cooling","premium gym tee","pro shirt","breathable"]
+    triggers: ["iceskin","ice skin","cooling","quick dry","breathable","premium gym tee","summer","hot","heat","pro shirt"]
   },
   {
     name: "AlphaFit Street Series Tee",
@@ -76,7 +79,7 @@ const PRODUCTS = [
     category: "fitness",
     material: "stretch cotton blend",
     sizes: ["S","M","L","XL","2XL","3XL"],
-    triggers: ["sculpted","slim fit","training tee","muscle fit"]
+    triggers: ["sculpted","slim fit","training tee","muscle fit","tight","athletic"]
   },
   {
     name: "AlphaFit Long Sleeve Comfort Tee",
@@ -85,10 +88,10 @@ const PRODUCTS = [
     category: "fitness",
     material: "cotton/poly blend",
     sizes: ["S","M","L","XL","2XL"],
-    triggers: ["long sleeve","cool weather","layering","alpha fit"]
+    triggers: ["long sleeve","cool weather","layering","alpha fit","autumn","winter"]
   },
 
-  // MOTIVATIONAL
+  // ---------- MOTIVATIONAL ----------
   {
     name: "Discipline Over Motivation Tee",
     url: "https://alphabooststore.com/products/discipline-over-motivation-tee",
@@ -96,7 +99,7 @@ const PRODUCTS = [
     category: "motivational",
     material: "100% US cotton",
     sizes: ["S","M","L","XL","2XL","3XL","4XL"],
-    triggers: ["discipline","motivation","no excuses","focus","grind","success"]
+    triggers: ["discipline","motivation","no excuses","focus","grind","success","consistency"]
   },
   {
     name: "YOU vs YOU – Conquer Your Inner Battles Tee",
@@ -105,7 +108,7 @@ const PRODUCTS = [
     category: "motivational",
     material: "100% cotton",
     sizes: ["S","M","L","XL","2XL","3XL"],
-    triggers: ["you vs you","inner battles","self discipline","mindset","focus"]
+    triggers: ["you vs you","inner battles","self discipline","mindset","focus","overcome"]
   },
   {
     name: "My Only Competition Is Me Tee",
@@ -114,7 +117,7 @@ const PRODUCTS = [
     category: "motivational",
     material: "cotton",
     sizes: ["S","M","L","XL","2XL","3XL"],
-    triggers: ["competition","self improvement","focus","discipline"]
+    triggers: ["competition","self improvement","focus","discipline","yesterday"]
   },
   {
     name: "No Fear No Limits Tee",
@@ -123,7 +126,7 @@ const PRODUCTS = [
     category: "motivational",
     material: "cotton",
     sizes: ["S","M","L","XL","2XL","3XL"],
-    triggers: ["no fear","no limits","fearless","extreme","courage"]
+    triggers: ["no fear","no limits","fearless","extreme","courage","bold"]
   },
   {
     name: "I Am The Storm Tee",
@@ -132,7 +135,7 @@ const PRODUCTS = [
     category: "motivational",
     material: "cotton",
     sizes: ["S","M","L","XL","2XL","3XL"],
-    triggers: ["storm","overcome","resilience","power","warrior"]
+    triggers: ["storm","overcome","resilience","power","warrior","thunder"]
   },
   {
     name: "Be Unstoppable Lion Tee",
@@ -141,7 +144,7 @@ const PRODUCTS = [
     category: "motivational",
     material: "cotton",
     sizes: ["S","M","L","XL","2XL","3XL","4XL"],
-    triggers: ["unstoppable","lion","courage","determination"]
+    triggers: ["unstoppable","lion","courage","determination","alpha"]
   },
   {
     name: "The Triad of Change Transformation Tee",
@@ -150,10 +153,10 @@ const PRODUCTS = [
     category: "motivational",
     material: "cotton",
     sizes: ["S","M","L","XL","2XL","3XL"],
-    triggers: ["triad of change","transformation","focus","discipline","balance"]
+    triggers: ["triad of change","transformation","focus","discipline","balance","system"]
   },
 
-  // GIFTS & INSPIRATIONAL
+  // ---------- GIFTS & INSPIRATIONAL ----------
   {
     name: "God Knew I Needed an Angel Tee",
     url: "https://alphabooststore.com/products/god-knew-i-needed-an-angel-unisex-comfort-t-shirt-gift-for-husband-wife",
@@ -161,7 +164,7 @@ const PRODUCTS = [
     category: "gift",
     material: "midweight cotton",
     sizes: ["S","M","L","XL","2XL","3XL"],
-    triggers: ["love","faith","wife","husband","gift","anniversary","romantic"]
+    triggers: ["gift","wife","husband","anniversary","love","romantic","partner","marriage","couple","angel","blessing","special occasion","present"]
   },
   {
     name: "God Knew I Needed Hope Tee",
@@ -170,7 +173,7 @@ const PRODUCTS = [
     category: "gift",
     material: "garment-dyed cotton",
     sizes: ["S","M","L","XL","2XL","3XL"],
-    triggers: ["hope","faith","encouragement","gift","inspiration"]
+    triggers: ["hope","faith","believe","positive","blessing","pray","church","support","light","good vibes","encouragement"]
   },
   {
     name: "HOPE – Hold On Pain Ends Tee",
@@ -179,13 +182,24 @@ const PRODUCTS = [
     category: "gift",
     material: "cotton",
     sizes: ["S","M","L","XL"],
-    triggers: ["hope","faith","pain ends","encouragement"]
+    triggers: ["hope","faith","pain ends","encouragement","angel wings","support"]
+  },
+
+  // ---------- BOOK / DIGITAL ----------
+  {
+    name: "The Triad of Change (Book)",
+    url: "https://alphabooststore.com/products/the-triad-of-change-complete-365-day-transformation-system",
+    price: 7.99,
+    category: "self-help",
+    material: "digital eBook",
+    sizes: [],
+    triggers: ["life change","personal growth","self improvement","transformation","discipline","365"]
   }
 ];
 
-/* ================================
+/* =======================================
    EMOTIONAL TRIGGERS – VARIATIONS
-================================ */
+======================================= */
 const TRIGGERS = {
   lost: [
     "Even the strongest warriors lose their way sometimes — let's get you back on track! 💪",
@@ -212,14 +226,92 @@ const TRIGGERS = {
     "True courage is acting in spite of fear. 💥"
   ]
 };
-/* ================================
-   HELPER FUNCTIONS
-================================ */
+
+/* =======================================
+   PRIORITY RULES (intent-based boosts)
+======================================= */
+const PRIORITY_RULES = [
+  // Summer / hot weather
+  {
+    keywords: ["hot weather","hot","heat","summer","quick dry","quick-dry","fast dry","cool","breathable","sweat","lightweight"],
+    boostFor: [
+      "alphafit hyperdry training tee",
+      "alphafit ice cotton tee",
+      "alphafit icesilk performance tee",
+      "alphafit iceskin pro tee"
+    ],
+    boostScore: 5
+  },
+  // Gift / romantic
+  {
+    keywords: ["gift","present","wife","husband","girlfriend","boyfriend","anniversary","valentine","romantic","partner","marriage","couple","love","special occasion","angel","blessing"],
+    boostFor: [
+      "god knew i needed an angel tee",
+      "god knew i needed hope tee",
+      "hope – hold on pain ends tee"
+    ],
+    boostScore: 5
+  },
+  // Motivation / warrior
+  {
+    keywords: ["warrior","fighter","battle","win","never give up","strength","focus","goal","discipline","motivation","overcome","mindset","alpha motivation"],
+    boostFor: [
+      "you vs you – conquer your inner battles tee",
+      "be unstoppable lion tee",
+      "the triad of change transformation tee",
+      "i am the storm tee",
+      "discipline over motivation tee",
+      "my only competition is me tee",
+      "no fear no limits tee"
+    ],
+    boostScore: 5
+  }
+];
+
+/* =======================================
+   HELPERS
+======================================= */
 function findProduct(message) {
-  const lowerMsg = message.toLowerCase();
-  return PRODUCTS.find(p =>
-    p.triggers.some(t => lowerMsg.includes(t))
+  const msg = message.toLowerCase();
+
+  // активни приоритети по ключови думи
+  const activeRules = PRIORITY_RULES.filter(rule =>
+    rule.keywords.some(k => msg.includes(k))
   );
+
+  let best = null;
+  let bestScore = 0;
+
+  for (const p of PRODUCTS) {
+    let score = 0;
+
+    // базов скоринг по тригери
+    for (const t of p.triggers) {
+      if (msg.includes(t.toLowerCase())) score += 1;
+    }
+
+    // приоритетни буустове
+    for (const rule of activeRules) {
+      const boosted = rule.boostFor.some(name => name === p.name.toLowerCase());
+      if (boosted) score += rule.boostScore;
+    }
+
+    if (score > bestScore) {
+      best = p;
+      bestScore = score;
+    }
+  }
+
+  // Fallback: ако има активни правила, но няма тригери — върни първия буустнат продукт
+  if (!best && activeRules.length) {
+    const names = new Set(PRODUCTS.map(x => x.name.toLowerCase()));
+    for (const rule of activeRules) {
+      const pick = rule.boostFor.find(n => names.has(n));
+      if (pick) return PRODUCTS.find(x => x.name.toLowerCase() === pick);
+    }
+  }
+
+  return best || null;
 }
 
 function getTriggerReply(message) {
@@ -232,9 +324,9 @@ function getTriggerReply(message) {
   return null;
 }
 
-/* ================================
+/* =======================================
    ROUTES
-================================ */
+======================================= */
 app.get("/health", (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
@@ -257,11 +349,12 @@ app.post("/chat", async (req, res) => {
 
     const systemPrompt = `
 You are Alpha Oracle for AlphaBoostStore.
-Reply in max 2 sentences, mix motivation with subtle sales.
+Reply ULTRA-CONCISE (max 2 sentences). Be motivating and subtly sales-driven.
 If product info is provided, include it naturally.
-If no product match, point to AlphaFit Collection: https://alphabooststore.com/collections/alphafit-collection
+If no product match, point to AlphaFit Collection with free US shipping and $5.99 worldwide: ${SHOP_URL}
 Tone: motivating, confident, helpful.
-` + context;
+${context}
+`.trim();
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -281,10 +374,9 @@ Tone: motivating, confident, helpful.
   }
 });
 
-/* ================================
-   START SERVER
-================================ */
+/* =======================================
+   START
+======================================= */
 app.listen(PORT, () => {
   console.log("Alpha Oracle listening on", PORT);
 });
-
