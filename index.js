@@ -200,4 +200,79 @@ const TRIGGERS = {
     "True courage is acting in spite of fear. 💥"
   ]
 };
+/* ================================
+   HELPER FUNCTIONS
+================================ */
+function findProduct(message) {
+  const lowerMsg = message.toLowerCase();
+  return PRODUCTS.find(p =>
+    p.triggers.some(t => lowerMsg.includes(t))
+  );
+}
+
+function getTriggerReply(message) {
+  const lowerMsg = message.toLowerCase();
+  for (const [trigger, replies] of Object.entries(TRIGGERS)) {
+    if (lowerMsg.includes(trigger)) {
+      return replies[Math.floor(Math.random() * replies.length)];
+    }
+  }
+  return null;
+}
+
+/* ================================
+   ROUTES
+================================ */
+app.get("/health", (req, res) => {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
+
+app.post("/chat", async (req, res) => {
+  try {
+    const userMsg = String(req.body?.message || "").slice(0, 500);
+    if (!OPENAI_API_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+
+    const product = findProduct(userMsg);
+    const triggerReply = getTriggerReply(userMsg);
+
+    let context = "";
+    if (product) {
+      context += `Recommend this product: ${product.name} - ${product.url} - Price: $${product.price}\nMaterial: ${product.material}\nSizes: ${product.sizes.join(", ")}\n`;
+    }
+    if (triggerReply) {
+      context += `Use this motivational line: "${triggerReply}"\n`;
+    }
+
+    const systemPrompt = `
+You are Alpha Oracle for AlphaBoostStore.
+Reply in max 2 sentences, mix motivation with subtle sales.
+If product info is provided, include it naturally.
+If no product match, point to AlphaFit Collection: https://alphabooststore.com/collections/alphafit-collection
+Tone: motivating, confident, helpful.
+` + context;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.6,
+      max_tokens: 90,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMsg }
+      ]
+    });
+
+    const reply = completion.choices?.[0]?.message?.content?.trim() || "I'm here.";
+    res.json({ reply });
+  } catch (err) {
+    console.error("CHAT ERROR:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/* ================================
+   START SERVER
+================================ */
+app.listen(PORT, () => {
+  console.log("Alpha Oracle listening on", PORT);
+});
 
