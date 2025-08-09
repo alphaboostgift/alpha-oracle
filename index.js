@@ -1,109 +1,203 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const { OpenAI } = require('openai');
-
-dotenv.config();
-
-const app = express();
-app.use(express.json());
-app.use(cors());
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// 🛍️ ALPHA BOOST PRODUCT DATABASE
-const PRODUCTS = {
-  fitness: {
-    name: "AlphaFit Classic Tee",
-    url: "https://alphabooststore.com/products/alphafit-classic-tee",
-    triggers: ["fitness", "workout", "strength", "gym", "muscle", "exercise", "athletic", "health"]
+/* ================================
+   PRODUCT DATABASE – FULL
+================================ */
+const PRODUCTS = [
+  // FITNESS
+  {
+    name: "AlphaFit Classic Muscle Tee",
+    url: "https://alphabooststore.com/products/alphafit-classic-muscle-tee",
+    price: 18.95,
+    category: "fitness",
+    material: "100% premium cotton",
+    sizes: ["S","M","L","XL","2XL"],
+    triggers: ["strength","muscles","gym","workout","training","power","muscle tee","alpha fit"]
   },
-  transformation: {
-    name: "The Triad of Change - Empowering Transformation Tee", 
-    url: "https://alphabooststore.com/products/the-triad-of-change-empowering-transformation-tee",
-    triggers: ["change", "transform", "life", "growth", "evolve", "better", "improve"]
+  {
+    name: "AlphaFit HyperDry Training Tee",
+    url: "https://alphabooststore.com/products/alphafit-hyperdry-training-tee",
+    price: 17.95,
+    category: "fitness",
+    material: "quick-dry polyester blend",
+    sizes: ["S","M","L","XL","2XL","3XL","4XL"],
+    triggers: ["quick dry","summer training","lightweight","polyester","gym shirt","training shirt"]
   },
-  warrior: {
-    name: "Warrior Rise Again - Mindset Tee",
-    url: "https://alphabooststore.com/products/warrior-rise-again-mindset-tee", 
-    triggers: ["warrior", "fight", "overcome", "rise", "battle", "conquer"]
+  {
+    name: "AlphaFit ICE Cotton Tee",
+    url: "https://alphabooststore.com/products/alphafit-ice-cotton-tee",
+    price: 22.95,
+    category: "fitness",
+    material: "ICE cotton",
+    sizes: ["S","M","L","XL","2XL","3XL","4XL"],
+    triggers: ["cool","breathable","summer","ice cotton","light","workout","alpha fit"]
   },
-  balance: {
-    name: "Balance Mind Heart Harmony Tee",
-    url: "https://alphabooststore.com/products/balance-mind-heart-harmony-tee",
-    triggers: ["balance", "harmony", "peace", "mind", "calm", "zen"]
+  {
+    name: "AlphaFit IceSilk Performance Tee",
+    url: "https://alphabooststore.com/products/alphafit-icesilk-performance-tee",
+    price: 18.95,
+    category: "fitness",
+    material: "IceSilk synthetic",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["icesilk","performance tee","gym performance","fast dry","lightweight","cool shirt"]
   },
-  angel: {
-    name: "God Knew I Needed An Angel - Comfort Tee",
+  {
+    name: "AlphaFit IceSkin Pro Tee",
+    url: "https://alphabooststore.com/products/alphafit-iceskin-pro-tee",
+    price: 24.95,
+    category: "fitness",
+    material: "cotton + synthetic blend",
+    sizes: ["S","M","L","XL","2XL","3XL","4XL"],
+    triggers: ["iceskin","cooling","premium gym tee","pro shirt","breathable"]
+  },
+  {
+    name: "AlphaFit Street Series Tee",
+    url: "https://alphabooststore.com/products/alphafit-street-series-tee",
+    price: 18.95,
+    category: "fitness",
+    material: "100% cotton",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["streetwear","urban","graphic tee","alpha fit"]
+  },
+  {
+    name: "AlphaFit Sculpted Training Tee",
+    url: "https://alphabooststore.com/products/alphafit-sculpted-training-tee",
+    price: 17.95,
+    category: "fitness",
+    material: "stretch cotton blend",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["sculpted","slim fit","training tee","muscle fit"]
+  },
+  {
+    name: "AlphaFit Long Sleeve Comfort Tee",
+    url: "https://alphabooststore.com/products/alphafit-long-sleeve-comfort-tee",
+    price: 22.95,
+    category: "fitness",
+    material: "cotton/poly blend",
+    sizes: ["S","M","L","XL","2XL"],
+    triggers: ["long sleeve","cool weather","layering","alpha fit"]
+  },
+
+  // MOTIVATIONAL
+  {
+    name: "Discipline Over Motivation Tee",
+    url: "https://alphabooststore.com/products/discipline-over-motivation-tee",
+    price: 22.99,
+    category: "motivational",
+    material: "100% US cotton",
+    sizes: ["S","M","L","XL","2XL","3XL","4XL"],
+    triggers: ["discipline","motivation","no excuses","focus","grind","success"]
+  },
+  {
+    name: "YOU vs YOU – Conquer Your Inner Battles Tee",
+    url: "https://alphabooststore.com/products/you-vs-you-conquer-your-inner-battles",
+    price: 22.99,
+    category: "motivational",
+    material: "100% cotton",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["you vs you","inner battles","self discipline","mindset","focus"]
+  },
+  {
+    name: "My Only Competition Is Me Tee",
+    url: "https://alphabooststore.com/products/my-only-competition-is-me-tee",
+    price: 22.99,
+    category: "motivational",
+    material: "cotton",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["competition","self improvement","focus","discipline"]
+  },
+  {
+    name: "No Fear No Limits Tee",
+    url: "https://alphabooststore.com/products/no-fear-no-limits-tee",
+    price: 24.99,
+    category: "motivational",
+    material: "cotton",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["no fear","no limits","fearless","extreme","courage"]
+  },
+  {
+    name: "I Am The Storm Tee",
+    url: "https://alphabooststore.com/products/i-am-the-storm-tee",
+    price: 24.99,
+    category: "motivational",
+    material: "cotton",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["storm","overcome","resilience","power","warrior"]
+  },
+  {
+    name: "Be Unstoppable Lion Tee",
+    url: "https://alphabooststore.com/products/be-unstoppable-lion-tee",
+    price: 17.99,
+    category: "motivational",
+    material: "cotton",
+    sizes: ["S","M","L","XL","2XL","3XL","4XL"],
+    triggers: ["unstoppable","lion","courage","determination"]
+  },
+  {
+    name: "The Triad of Change Transformation Tee",
+    url: "https://alphabooststore.com/products/the-triad-of-change-transformation-tee",
+    price: 17.99,
+    category: "motivational",
+    material: "cotton",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["triad of change","transformation","focus","discipline","balance"]
+  },
+
+  // GIFTS & INSPIRATIONAL
+  {
+    name: "God Knew I Needed an Angel Tee",
     url: "https://alphabooststore.com/products/god-knew-i-needed-an-angel-unisex-comfort-t-shirt-gift-for-husband-wife",
-    triggers: ["angel", "love", "blessed", "gift", "faith", "spiritual"]
+    price: 17.99,
+    category: "gift",
+    material: "midweight cotton",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["love","faith","wife","husband","gift","anniversary","romantic"]
   },
-  performance: {
-    name: "AlphaFit™ IceSkin Pro Tee - Feather Light",
-    url: "https://alphabooststore.com/products/alphafit%E2%84%A2-iceskin-pro-tee-feather-light-breathable-athletic-cut",
-    triggers: ["performance", "athletic", "sports", "training", "breathable"]
+  {
+    name: "God Knew I Needed Hope Tee",
+    url: "https://alphabooststore.com/products/god-knew-i-needed-hope-tee",
+    price: 22.99,
+    category: "gift",
+    material: "garment-dyed cotton",
+    sizes: ["S","M","L","XL","2XL","3XL"],
+    triggers: ["hope","faith","encouragement","gift","inspiration"]
   },
-  confidence: {
-    name: "AlphaFit™ Sculpted Tee - Muscle Fit", 
-    url: "https://alphabooststore.com/products/alphafit%E2%84%A2-sculpted-tee-short-sleeve-muscle-fit",
-    triggers: ["confidence", "sculpted", "muscle", "fit", "physique"]
+  {
+    name: "HOPE – Hold On Pain Ends Tee",
+    url: "https://alphabooststore.com/products/hope-hold-on-pain-ends-tee",
+    price: 24.99,
+    category: "gift",
+    material: "cotton",
+    sizes: ["S","M","L","XL"],
+    triggers: ["hope","faith","pain ends","encouragement"]
   }
+];
+
+/* ================================
+   EMOTIONAL TRIGGERS – VARIATIONS
+================================ */
+const TRIGGERS = {
+  lost: [
+    "Even the strongest warriors lose their way sometimes — let's get you back on track! 💪",
+    "Feeling lost is just the first step to finding your real path. 🚀"
+  ],
+  no_energy: [
+    "Energy isn't just physical — it's mental. Let's refuel both! ⚡",
+    "Low energy? Time to reignite your fire! 🔥"
+  ],
+  self_doubt: [
+    "Doubt is just the mind's way of testing your will. Prove it wrong! 💥",
+    "Believe in yourself for just one more day — it might be the day everything changes. 🌟"
+  ],
+  love: [
+    "Love is the strongest force — and the best reason to surprise them. ❤️",
+    "Some gifts speak louder than words — this could be one of them. 💝"
+  ],
+  motivation: [
+    "Motivation fades, discipline stays — let's make it happen today. 🔥",
+    "Stay consistent, and results will come before you know it. 💪"
+  ],
+  courage: [
+    "Fear is temporary. Regret is forever — take the step now. ⚔️",
+    "True courage is acting in spite of fear. 💥"
+  ]
 };
 
-const COLLECTION_URL = "https://alphabooststore.com/collections/alphafit-collection";
-const SHIPPING_INFO = "🚚 Delivery: Free in USA | $5.99 worldwide";
-
-// 🧠 Function to find matching product
-function findMatchingProduct(message) {
-  const messageLower = message.toLowerCase();
-  for (const product of Object.values(PRODUCTS)) {
-    if (product.triggers.some(trigger => messageLower.includes(trigger))) {
-      return product;
-    }
-  }
-  return null;
-}
-
-// 🧙‍♂️ MAIN ENDPOINT
-app.post('/chat', async (req, res) => {
-  try {
-    const { message } = req.body;
-    const matchedProduct = findMatchingProduct(message);
-
-    let systemPrompt = `You are Alpha Oracle — a short, powerful motivational guide in an online store.
-RULES:
-- Answer in max 3 short sentences.
-- Always give 1 motivational line + 1 suggestion to view a product or the AlphaFit Collection.
-- Mention: "${SHIPPING_INFO}" at the end.
-- If a specific product matches, suggest it, else suggest the AlphaFit Collection: ${COLLECTION_URL}.
-Keep it friendly, confident, and inspiring.`;
-
-    const completion = await openai.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: message }
-      ],
-      model: "gpt-4o-mini",
-      temperature: 0.8,
-      max_tokens: 80
-    });
-
-    const reply = completion.choices[0].message.content;
-    res.json({ reply });
-
-  } catch (err) {
-    console.error('❌ OpenAI error:', err);
-    res.status(500).json({ error: 'Alpha Oracle is temporarily unavailable.' });
-  }
-});
-
-// Health check
-app.get('/', (req, res) => {
-  res.send('🔥 Alpha Oracle is live!');
-});
-
-app.listen(3000, () => {
-  console.log('✅ Running on http://localhost:3000');
-});
