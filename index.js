@@ -3,8 +3,6 @@ import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import OpenAI from "openai";
-import fetch from "node-fetch"; // ако си на Node 18+, може да махнеш този импорт
-
 /* ================== App & Config ================== */
 const app = express();
 app.use(cors());
@@ -13,7 +11,8 @@ app.use(express.json({ limit: "1mb" }));
 const PORT = process.env.PORT || 10000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const MONGODB_URI = process.env.MONGODB_URI;
-const SHOPIFY_STORE = process.env.SHOPIFY_STORE;               // https://alphabooststore.com
+const SHOPIFY_PUBLIC_URL = process.env.SHOPIFY_PUBLIC_URL || process.env.SHOPIFY_STORE;
+const SHOPIFY_ADMIN_DOMAIN = process.env.SHOPIFY_ADMIN_DOMAIN || process.env.SHOPIFY_STORE;
 const SHOPIFY_ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
@@ -118,9 +117,13 @@ async function loadProductsForKW() {
   if (Date.now() - KW_CACHE.ts < FRESH_FOR_MS && KW_CACHE.products.length) {
     return KW_CACHE.products;
   }
-  const products = await Product.find({}).lean();
-  KW_CACHE = { products, ts: Date.now() };
-  return products;
+  const products = await Product.find({}, { title: 1, body_html: 1, tags: 1, handle: 1 }).lean();
+  const enriched = products.map(p => ({
+    ...p,
+    __kw: generateKeywordsFromProduct(p) // предсметнати ключови думи
+  }));
+  KW_CACHE = { products: enriched, ts: Date.now() };
+  return KW_CACHE.products;
 }
 
 async function findProductsByKeywordsNoAI(userMsg, limit = 3) {
@@ -129,11 +132,9 @@ async function findProductsByKeywordsNoAI(userMsg, limit = 3) {
 
   const scored = products
     .map(p => {
-      const pkw = generateKeywordsFromProduct(p);
-      // броим съвпадения по принципа "съдържа/частично съвпадение"
       let score = 0;
       for (const u of userKW) {
-        if (pkw.some(k => k.includes(u) || u.includes(k))) score++;
+        if (p.__kw.some(k => k.includes(u) || u.includes(k))) score++;
       }
       return { p, score };
     })
@@ -143,7 +144,7 @@ async function findProductsByKeywordsNoAI(userMsg, limit = 3) {
     .map(x => ({
       title: x.p.title,
       handle: x.p.handle,
-      url: `${SHOPIFY_STORE}/products/${x.p.handle}`,
+      url: `${SHOPIFY_PUBLIC_URL}/products/${x.p.handle}`,
       tags: x.p.tags || [],
       score: x.score
     }));
@@ -214,12 +215,12 @@ async function bumpScore(trigger, productHandle, type) {
 
 /* ================== Shopify Sync (cron + webhooks) ================== */
 async function fetchShopifyProducts(pageInfo = null) {
-  if (!SHOPIFY_STORE || !SHOPIFY_ADMIN_TOKEN) {
-    console.warn("⚠️ SHOPIFY_STORE or SHOPIFY_ADMIN_TOKEN missing – skipping sync.");
+  if (!SHOPIFY_ADMIN_DOMAIN || !SHOPIFY_ADMIN_TOKEN) {
+    console.warn("⚠️ SHOPIFY_ADMIN_DOMAIN or SHOPIFY_ADMIN_TOKEN missing – skipping sync.");
     return { products: [], nextPage: null };
   }
 
-  const url = new URL(`${SHOPIFY_STORE}/admin/api/2024-07/products.json`);
+  const url = new URL(`${SHOPIFY_ADMIN_DOMAIN}/admin/api/2024-07/products.json`);
   url.searchParams.set("limit", "250");
   if (pageInfo) url.searchParams.set("page_info", pageInfo);
 
@@ -234,7 +235,7 @@ async function fetchShopifyProducts(pageInfo = null) {
 }
 
 async function syncProductsFromShopify() {
-  if (!SHOPIFY_STORE || !SHOPIFY_ADMIN_TOKEN) return;
+  if (!SHOPIFY_ADMIN_DOMAIN || !SHOPIFY_ADMIN_TOKEN) return;
   console.log("↻ Sync products...");
   let page = null, total = 0;
   do {
@@ -347,14 +348,14 @@ app.post("/chat", async (req, res) => {
     // 2) Build context for OpenAI
     let context = "";
     if (products.length) {
-      const productLines = products.map(p => `• ${p.title} – ${SHOPIFY_STORE}/products/${p.handle}`);
+      const productLines = products.map(p => `• ${p.title} – ${SHOPIFY_PUBLIC_URL}/products/${p.handle}`);
       context = `Available products:\n${productLines.join("\n")}\n`;
     }
 
     // 3) Improved system prompt
     const system = `You are Alpha Oracle for AlphaBoostStore - cosmic wellness and fitness guide.
 Reply ULTRA-CONCISE (max 2 sentences). Be motivating, helpful, and subtly sales-driven.
-${context ? 'ONLY recommend products from the available products list above.' : 'If no specific products match, guide users to https://alphabooststore.com/collections/special-deals'}
+${context ? 'ONLY recommend products from the available products list above.' : `If no specific products match, guide users to ${SHOPIFY_PUBLIC_URL}/collections/special-deals`}
 Tone: motivating, confident, cosmic wisdom.
 ${context}`.trim();
 
@@ -386,7 +387,7 @@ ${context}`.trim();
       products: products.map(p => ({ 
         handle: p.handle, 
         title: p.title, 
-        url: `${SHOPIFY_STORE}/products/${p.handle}`,
+        url: `${SHOPIFY_PUBLIC_URL}/products/${p.handle}`,
         matchScore: p.score || 0
       }))
     });
