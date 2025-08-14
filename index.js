@@ -1,4 +1,4 @@
-// ===== Alpha Oracle - One-file Server (ESM) =====
+// ===== Alpha Oracle - Enhanced with FREE Keyword Matching =====
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
@@ -85,7 +85,73 @@ const EventModel = mongoose.model("Event", eventSchema);
 const Product = mongoose.model("Product", productSchema);
 const Score = mongoose.model("Score", scoreSchema);
 
-/* ================== Utilities ================== */
+/* ================== FREE KEYWORD MATCHING SYSTEM ================== */
+const STOPWORDS = new Set([
+  "the","and","for","with","a","to","of","in","on","at","by","is","are","from",
+  "your","you","our","this","that","these","those","it","as","be","or","an","we"
+]);
+
+function tokenize(raw = "") {
+  return [...new Set(
+    String(raw)
+      .toLowerCase()
+      .replace(/<[^>]*>/g, "")            // strip HTML
+      .split(/[^a-z0-9]+/g)               // split non-alnum
+      .filter(w => w && w.length > 2 && !STOPWORDS.has(w))
+  )];
+}
+
+function generateKeywordsFromProduct(p) {
+  const text = `${p?.title || ""} ${p?.body_html || ""} ${(p?.tags || []).join(" ")}`;
+  return tokenize(text);
+}
+
+function extractUserKeywords(q) {
+  return tokenize(q).slice(0, 10);        // максимум 10 ключови думи от потребителя
+}
+
+// Кеш в паметта (освежава се на ~5 минути)
+let KW_CACHE = { products: [], ts: 0 };
+
+async function loadProductsForKW() {
+  const FRESH_FOR_MS = 5 * 60 * 1000;     // 5 мин.
+  if (Date.now() - KW_CACHE.ts < FRESH_FOR_MS && KW_CACHE.products.length) {
+    return KW_CACHE.products;
+  }
+  const products = await Product.find({}).lean();
+  KW_CACHE = { products, ts: Date.now() };
+  return products;
+}
+
+async function findProductsByKeywordsNoAI(userMsg, limit = 3) {
+  const products = await loadProductsForKW();
+  const userKW = extractUserKeywords(userMsg);
+
+  const scored = products
+    .map(p => {
+      const pkw = generateKeywordsFromProduct(p);
+      // броим съвпадения по принципа "съдържа/частично съвпадение"
+      let score = 0;
+      for (const u of userKW) {
+        if (pkw.some(k => k.includes(u) || u.includes(k))) score++;
+      }
+      return { p, score };
+    })
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(x => ({
+      title: x.p.title,
+      handle: x.p.handle,
+      url: `${SHOPIFY_STORE}/products/${x.p.handle}`,
+      tags: x.p.tags || [],
+      score: x.score
+    }));
+
+  return scored;
+}
+
+/* ================== Original Utilities (Enhanced) ================== */
 function extractKeywords(text) {
   return (text || "")
     .toLowerCase()
@@ -126,10 +192,19 @@ async function rankByScores(trigger, products) {
 }
 
 async function recommendProducts(userMessage) {
+  // 1) Първо пробваме MongoDB text search
   const kws = extractKeywords(userMessage);
-  const base = await findProductsByKeywords(kws);
-  const ranked = await rankByScores(kws[0] || "general", base);
-  return ranked.slice(0, 3);
+  const dbItems = await findProductsByKeywords(kws);
+  
+  if (dbItems?.length) {
+    const ranked = await rankByScores(kws[0] || "general", dbItems);
+    return ranked.slice(0, 3);
+  }
+
+  // 2) Fallback към безплатния keyword matcher
+  console.log("💡 Using free keyword matching...");
+  const kwResults = await findProductsByKeywordsNoAI(userMessage, 3);
+  return kwResults;
 }
 
 async function bumpScore(trigger, productHandle, type) {
@@ -184,6 +259,9 @@ async function syncProductsFromShopify() {
     page = nextPage;
   } while (page);
   console.log(`✅ Synced ${total} products`);
+  
+  // Clear cache to force refresh
+  KW_CACHE = { products: [], ts: 0 };
 }
 
 // стартов синк + периодичен (на 60 мин)
@@ -209,6 +287,11 @@ app.post("/webhooks/shopify/product", express.json({ type: "*/*" }), async (req,
       },
       { upsert: true }
     );
+    
+    // Clear cache when new product added
+    KW_CACHE = { products: [], ts: 0 };
+    console.log(`📦 Product updated via webhook: ${p.title}`);
+    
     res.status(200).send("ok");
   } catch (e) {
     console.error("Webhook error:", e);
@@ -252,19 +335,30 @@ app.post("/feedback", async (req, res) => {
   }
 });
 
-/* ================== Chat Endpoint ================== */
+/* ================== Enhanced Chat Endpoint ================== */
 app.post("/chat", async (req, res) => {
   try {
     const { message, sessionId } = req.body || {};
     if (!message) return res.status(400).json({ error: "message is required" });
 
-    // 1) намери продукти
+    // 1) Enhanced product finding with fallback
     const products = await recommendProducts(message);
-    const productLines = products.map(p => `• ${p.title} – ${SHOPIFY_STORE}/products/${p.handle}`);
+    
+    // 2) Build context for OpenAI
+    let context = "";
+    if (products.length) {
+      const productLines = products.map(p => `• ${p.title} – ${SHOPIFY_STORE}/products/${p.handle}`);
+      context = `Available products:\n${productLines.join("\n")}\n`;
+    }
 
-    // 2) кратък продаващ отговор
-    const system = "Be brief, motivating, and sales-oriented. Always include 1–3 relevant store products with links. Keep under 120 words.";
-    const user = `User message:\n${message}\n\nRelevant products:\n${productLines.join("\n")}`;
+    // 3) Improved system prompt
+    const system = `You are Alpha Oracle for AlphaBoostStore - cosmic wellness and fitness guide.
+Reply ULTRA-CONCISE (max 2 sentences). Be motivating, helpful, and subtly sales-driven.
+${context ? 'ONLY recommend products from the available products list above.' : 'If no specific products match, guide users to https://alphabooststore.com/collections/special-deals'}
+Tone: motivating, confident, cosmic wisdom.
+${context}`.trim();
+
+    const user = `User message: ${message}`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -278,18 +372,23 @@ app.post("/chat", async (req, res) => {
 
     const reply = completion.choices?.[0]?.message?.content?.trim() || "Got it.";
 
-    // 3) логни чата
+    // 4) Enhanced logging
     await ChatLog.create({
       sessionId,
       userMessage: message,
       botReply: reply,
       productHandles: products.map(p => p.handle),
-      triggers: extractKeywords(message)
+      triggers: extractUserKeywords(message)
     });
 
     res.json({
       reply,
-      products: products.map(p => ({ handle: p.handle, title: p.title, url: `${SHOPIFY_STORE}/products/${p.handle}` }))
+      products: products.map(p => ({ 
+        handle: p.handle, 
+        title: p.title, 
+        url: `${SHOPIFY_STORE}/products/${p.handle}`,
+        matchScore: p.score || 0
+      }))
     });
   } catch (e) {
     console.error("chat error:", e);
@@ -297,14 +396,31 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-/* ================== Health ================== */
+/* ================== Health & Debug Endpoints ================== */
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
 app.get("/health/db", async (_req, res) => {
   try {
     await mongoose.connection.db.admin().ping();
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+// Debug endpoint to test keyword matching
+app.get("/debug/keywords/:query", async (req, res) => {
+  try {
+    const { query } = req.params;
+    const keywords = extractUserKeywords(query);
+    const matches = await findProductsByKeywordsNoAI(query, 5);
+    res.json({ 
+      query, 
+      keywords, 
+      matches: matches.map(m => ({ title: m.title, score: m.score }))
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
   }
 });
 
