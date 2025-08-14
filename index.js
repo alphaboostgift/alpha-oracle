@@ -84,11 +84,48 @@ const EventModel = mongoose.model("Event", eventSchema);
 const Product = mongoose.model("Product", productSchema);
 const Score = mongoose.model("Score", scoreSchema);
 
-/* ================== FREE KEYWORD MATCHING SYSTEM ================== */
+/* ================== FREE KEYWORD MATCHING SYSTEM + INTENT DETECTION ================== */
 const STOPWORDS = new Set([
   "the","and","for","with","a","to","of","in","on","at","by","is","are","from",
   "your","you","our","this","that","these","those","it","as","be","or","an","we"
 ]);
+
+// Intent Detection System
+const INTENTS = {
+  oils: ["essential oil", "essential oils", "aromatherapy", "diffuser", "oil", "oils"],
+  apparel: ["shirt", "tee", "t-shirt", "hoodie", "apparel", "clothing", "size", "xl", "l", "m", "s"],
+  skincare: ["eye", "roller", "massage", "mask", "cream", "serum", "tired eyes", "eye strain"]
+};
+
+function detectIntent(q = "") {
+  const t = q.toLowerCase();
+  for (const [k, words] of Object.entries(INTENTS)) {
+    if (words.some(w => t.includes(w))) return k;
+  }
+  return null;
+}
+
+function categoryForProduct(p) {
+  const kw = generateKeywordsFromProduct(p);
+  const bag = new Set([...(p.tags || []).map(x => x.toLowerCase()), ...kw]);
+
+  const has = (...arr) => arr.some(x => bag.has(x));
+
+  if (has("shirt","tee","t-shirt","hoodie","apparel","clothing")) return "apparel";
+  if (has("essential","oils","aromatherapy","diffuser","oil")) return "oils";
+  if (has("eye","roller","massage","mask","cream","serum")) return "skincare";
+  return null;
+}
+
+function intentScore(intent, p) {
+  if (!intent) return 0;
+  const cat = categoryForProduct(p);
+  if (intent === cat) return 3;               // силен boost
+  // твърдо наказание за дрехи при други намерения
+  if (intent === "oils" && cat === "apparel") return -5;
+  if (intent === "skincare" && cat === "apparel") return -3;
+  return 0;
+}
 
 function tokenize(raw = "") {
   return [...new Set(
@@ -126,19 +163,26 @@ async function loadProductsForKW() {
   return KW_CACHE.products;
 }
 
-async function findProductsByKeywordsNoAI(userMsg, limit = 3) {
+async function findProductsByKeywordsNoAI(userMsg, limit = 3, intent = null) {
   const products = await loadProductsForKW();
   const userKW = extractUserKeywords(userMsg);
 
   const scored = products
     .map(p => {
-      let score = 0;
+      // по-точно броене на съвпадения
+      let exact = 0, partial = 0;
       for (const u of userKW) {
-        if (p.__kw.some(k => k.includes(u) || u.includes(k))) score++;
+        for (const k of p.__kw) {
+          if (k === u) exact++;
+          else if (k.length > 4 && u.length > 4 && (k.includes(u) || u.includes(k))) partial++;
+        }
       }
-      return { p, score };
+
+      let score = exact * 2 + partial + intentScore(intent, p);
+      return { p, score, exact, partial };
     })
-    .filter(x => x.score > 0)
+    // режем шум и твърди несъответствия
+    .filter(x => (x.exact >= 1 || x.score >= 3))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map(x => ({
@@ -193,18 +237,31 @@ async function rankByScores(trigger, products) {
 }
 
 async function recommendProducts(userMessage) {
+  const intent = detectIntent(userMessage);
+  console.log(`🎯 Detected intent: ${intent || 'none'}`);
+
   // 1) Първо пробваме MongoDB text search
   const kws = extractKeywords(userMessage);
-  const dbItems = await findProductsByKeywords(kws);
-  
+  let dbItems = await findProductsByKeywords(kws);
+
   if (dbItems?.length) {
-    const ranked = await rankByScores(kws[0] || "general", dbItems);
-    return ranked.slice(0, 3);
+    // филтър/ранк според intent (ако има)
+    if (intent) {
+      dbItems = dbItems
+        .map(p => ({ p, bonus: intentScore(intent, p) }))
+        .filter(x => x.bonus >= 0)             // drop твърди несъответствия (дрехи при oils)
+        .sort((a, b) => b.bonus - a.bonus)
+        .map(x => x.p);
+    }
+    if (dbItems.length) {
+      const ranked = await rankByScores(kws[0] || "general", dbItems);
+      return ranked.slice(0, 3);
+    }
   }
 
-  // 2) Fallback към безплатния keyword matcher
-  console.log("💡 Using free keyword matching...");
-  const kwResults = await findProductsByKeywordsNoAI(userMessage, 3);
+  // 2) Fallback към безплатния keyword matcher + intent
+  console.log("💡 Using free keyword matching with intent...");
+  const kwResults = await findProductsByKeywordsNoAI(userMessage, 3, intent);
   return kwResults;
 }
 
@@ -409,16 +466,18 @@ app.get("/health/db", async (_req, res) => {
   }
 });
 
-// Debug endpoint to test keyword matching
+// Enhanced debug endpoint with intent detection
 app.get("/debug/keywords/:query", async (req, res) => {
   try {
     const { query } = req.params;
     const keywords = extractUserKeywords(query);
-    const matches = await findProductsByKeywordsNoAI(query, 5);
+    const intent = detectIntent(query);
+    const matches = await findProductsByKeywordsNoAI(query, 5, intent);
     res.json({ 
       query, 
       keywords, 
-      matches: matches.map(m => ({ title: m.title, score: m.score }))
+      intent,
+      matches: matches.map(m => ({ title: m.title, score: m.score, category: categoryForProduct({title: m.title, tags: m.tags}) }))
     });
   } catch (e) {
     res.status(500).json({ error: String(e) });
